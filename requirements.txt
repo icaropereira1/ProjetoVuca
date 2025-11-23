@@ -1,29 +1,9 @@
 streamlit
 pandas
 numpy
-python-dotenv
-requests
-pillow
 plotly
-altair
-
-# --- IA e LLMs ---
-# Deixando sem versão para o pip resolver o conflito do Google automaticamente
-google-generativeai
-langchain-google-genai
-langchain-core
+python-dotenv
 crewai
 openai
-litellm
-
-# --- Banco de Dados Vetorial (RAG) ---
-chromadb
-
-# --- Processamento de Arquivos e PDF ---
-openpyxl
-pdfplumber
-pdfminer.six
-pypdfium2
-
-# --- Utilitários ---
-watchdog
+langchain-google-genai
+google-generativeai
