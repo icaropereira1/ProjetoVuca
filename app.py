@@ -190,7 +190,7 @@ if not vendas.empty and not custos.empty:
         st.markdown("---")
 
         # 4. SEÇÃO DE CHAT (MOVIDO PARA BAIXO)
-        st.subheader(f"💬 Chat com seus Dados")
+        st.subheader(f"💬 Chat com seus dados")
         st.caption("Pergunte sobre faturamento, margens ou detalhes dos produtos.")
 
         if "messages" not in st.session_state:
