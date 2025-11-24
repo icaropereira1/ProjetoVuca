@@ -30,7 +30,7 @@ def limpar_texto_ia(texto_obj):
 
 # --- BARRA LATERAL ---
 st.sidebar.title("🔧 Configurações da IA")
-provedor = st.sidebar.selectbox("Escolha a Inteligência:", ["Gemini", "ChatGPT"])
+provedor = st.sidebar.selectbox("Escolha a Inteligência:", ["ChatGPT", "Gemini"])
 
 api_key_final = None
 modelo_selecionado = None
