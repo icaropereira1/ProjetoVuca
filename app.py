@@ -50,7 +50,7 @@ elif provedor == "ChatGPT":
     api_key_final = env_key if env_key else st.sidebar.text_input("OpenAI API Key:", type="password")
 
 if api_key_final:
-    if provedor == "Google Gemini":
+    if provedor == "Gemini":
         os.environ["GOOGLE_API_KEY"] = api_key_final
     else:
         os.environ["OPENAI_API_KEY"] = api_key_final
