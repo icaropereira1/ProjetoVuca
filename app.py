@@ -122,7 +122,7 @@ if not vendas.empty and not custos.empty:
 
         # 2. SEÇÃO DE GRÁFICOS
         fig = px.scatter(
-            df_final, x="Popularidade", y="Lucratividade", color="Classificação",
+            df_final, x="popularidade", y="lucratividade", color="classificacao",
             size="popularidade", hover_name="produto_nome",
             color_discrete_map={
                 '⭐ Estrela': '#FFD700', '🐴 Burro de Carga': '#1E90FF',
