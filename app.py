@@ -127,11 +127,12 @@ if not vendas.empty and not custos.empty:
 
         # 1. SEÇÃO DE KPIs
         st.markdown("### 📊 Visão Geral do Cardápio")
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Total Produtos", len(df_final))
         c2.metric("⭐ Estrelas", len(df_final[df_final['classificacao'] == '⭐ Estrela']))
         c3.metric("🧩 Quebra-cabeças", len(df_final[df_final['classificacao'] == '🧩 Quebra-cabeça']))
         c4.metric("🐶 Cães", len(df_final[df_final['classificacao'] == '🐶 Cão']))
+        c5.metric("🐴 Burro de Carga", len(df_final[df_final['classificacao'] == '🐴 Burro de Carga']))
 
         # 2. SEÇÃO DE GRÁFICOS
         fig = px.scatter(
