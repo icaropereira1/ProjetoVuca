@@ -132,7 +132,7 @@ if st.session_state.user_name == '':
         st.rerun()
     st.stop()
 
-st.markdown(f"Painel de Controle de: **{st.session_state.user_name}**")
+st.markdown(f"Painel de Controle de **{st.session_state.user_name}**")
 
 # ==============================================================================
 # SEÇÃO 1: SOBRE O PROJETO (EXPANDER)
