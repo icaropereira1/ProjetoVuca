@@ -92,7 +92,7 @@ CORES_MATRIZ = {
 
 # --- INTERFACE LATERAL ---
 st.sidebar.title("🔧 Configurações ChefIA")
-provedor = st.sidebar.selectbox("Cérebro da IA:", ["Gemini", "DeepSeek", "Perplexity", "ChatGPT"])
+provedor = st.sidebar.selectbox("Selecione a LLM:", ["Gemini", "DeepSeek", "Perplexity", "ChatGPT"])
 
 api_key_final = None
 modelo_selecionado = None
