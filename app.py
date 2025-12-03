@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import os
 from dotenv import load_dotenv
 
 # --- IMPORTAÇÕES DE IA ---
+# Nota: CrewAI agora usa a classe LLM para gerenciar conexões via litellm
 from crewai import Agent, Task, Crew, Process, LLM
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 # --- CONFIGURAÇÃO INICIAL ---
 load_dotenv()
@@ -21,62 +20,88 @@ def classificar_produto(row, pop, luc):
     else: return '⚠️ Crítico'
 
 def limpar_texto_ia(texto_obj):
+    # Garante que o output seja string pura para evitar erros de renderização
     texto = str(texto_obj.raw) if hasattr(texto_obj, 'raw') else str(texto_obj)
     return texto.replace("$", "\\$")
 
 # --- FUNÇÕES DOS AGENTES ---
-def get_llm(provedor, modelo, api_key):
-    if provedor == "Gemini":
-        return ChatGoogleGenerativeAI(
-            model=modelo.split("/")[-1],
-            verbose=True, temperature=0.4, google_api_key=api_key
-        )
-    else:
-        return LLM(model=modelo, api_key=api_key)
+def get_llm(modelo_string, api_key):
+    """
+    Instancia a LLM usando a classe nativa do CrewAI (via litellm).
+    O modelo_string deve vir no formato 'provider/model-name'.
+    """
+    return LLM(
+        model=modelo_string,
+        api_key=api_key,
+        temperature=0.4
+    )
 
-def executar_agente_analise(dados_csv, provedor, modelo, api_key):
-    llm = get_llm(provedor, modelo, api_key)
+def executar_agente_analise(dados_csv, modelo_string, api_key):
+    llm = get_llm(modelo_string, api_key)
 
     analista = Agent(
         role="Analista de Menu",
         goal="Identificar itens críticos e oportunidades de lucro.",
-        backstory="Especialista em Engenharia de Cardápio.",
-        verbose=True, llm=llm, allow_delegation=False
+        backstory="Especialista em Engenharia de Cardápio com foco em análise de dados.",
+        verbose=True,
+        llm=llm,
+        allow_delegation=False
     )
     
     consultor = Agent(
         role="Consultor Estratégico",
-        goal="Criar um plano de ação prático.",
-        backstory="Consultor experiente que dá dicas diretas.",
-        verbose=True, llm=llm, allow_delegation=False
+        goal="Criar um plano de ação prático e resumido.",
+        backstory="Consultor experiente que dá dicas diretas e acionáveis para donos de restaurante.",
+        verbose=True,
+        llm=llm,
+        allow_delegation=False
     )
     
     t1 = Task(
-        description=f"Analise:\n{dados_csv}\nIdentifique: 1. O item 'Estrela' ou 'Oportunidade' mais promissor. 2. Um item 'Crítico' ou 'Popular' que precisa de ajuste.",
-        expected_output="Resumo técnico.", agent=analista
+        description=f"""
+        Analise os seguintes dados do menu (CSV):
+        {dados_csv}
+        
+        Sua missão:
+        1. Identifique o item classificado como 'Estrela' ou 'Oportunidade' mais promissor.
+        2. Identifique um item 'Crítico' ou 'Popular' que precisa de ajuste urgente.
+        """,
+        expected_output="Um resumo técnico curto identificando os itens.",
+        agent=analista
     )
     
     t2 = Task(
-        description="Escreva 3 recomendações práticas e curtas baseadas na análise. Use emojis.",
-        expected_output="Texto formatado.", agent=consultor, context=[t1]
+        description="Com base na análise técnica, escreva 3 recomendações práticas e curtas (máximo 1 frase cada). Use emojis.",
+        expected_output="Três tópicos com recomendações.",
+        agent=consultor,
+        context=[t1] # Passa o resultado da tarefa 1 para o consultor
     )
     
     crew = Crew(agents=[analista, consultor], tasks=[t1, t2], process=Process.sequential)
     return crew.kickoff()
 
-def executar_chat(pergunta, dados_csv, provedor, modelo, api_key):
-    llm = get_llm(provedor, modelo, api_key)
+def executar_chat(pergunta, dados_csv, modelo_string, api_key):
+    llm = get_llm(modelo_string, api_key)
     
     analista_chat = Agent(
         role="CFO Virtual de Restaurante",
         goal="Responder perguntas sobre faturamento, margens e desempenho.",
-        backstory="Você tem acesso aos dados financeiros exatos do restaurante. Responda de forma direta, sem enrolação. Se perguntarem sobre lucro, use (Preço - Custo).",
-        verbose=True, llm=llm, allow_delegation=False
+        backstory="Você tem acesso aos dados financeiros exatos do restaurante. Responda de forma direta, sem enrolação. Sempre que possível, cite números.",
+        verbose=True,
+        llm=llm,
+        allow_delegation=False
     )
     
     task_chat = Task(
-        description=f"Pergunta do usuário: '{pergunta}'\n\nDados do restaurante:\n{dados_csv}\n\nResponda à pergunta com base nos dados.",
-        expected_output="Resposta direta à pergunta.",
+        description=f"""
+        Pergunta do usuário: '{pergunta}'
+        
+        Dados do restaurante (Contexto):
+        {dados_csv}
+        
+        Responda à pergunta com base estritamente nos dados acima.
+        """,
+        expected_output="Resposta direta à pergunta do usuário.",
         agent=analista_chat
     )
     
@@ -92,34 +117,32 @@ CORES_MATRIZ = {
 
 # --- INTERFACE LATERAL ---
 st.sidebar.title("🔧 Configurações ChefIA")
-provedor = st.sidebar.selectbox("Selecione a LLM:", ["Gemini", "DeepSeek", "Perplexity", "ChatGPT"])
+provedor = st.sidebar.selectbox("Selecione a LLM:", ["Gemini", "OpenAI (ChatGPT)", "DeepSeek", "Perplexity"])
 
 api_key_final = None
 modelo_selecionado = None
 
+# Configuração das chaves e strings de modelo compatíveis com litellm
 if provedor == "Gemini":
-    mod = st.sidebar.selectbox("Modelo:", ["gemini-1.5-flash", "gemini-pro"])
-    modelo_selecionado = f"google_gemini/{mod}"
+    mod = st.sidebar.selectbox("Modelo:", ["gemini-2.0-flash","gemini-2.0-flash-lite","gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro","gemini-3-pro-preview"])
+    # O prefixo 'gemini/' é crucial para o litellm identificar o provedor Google
+    modelo_selecionado = f"gemini/{mod}"
     api_key_final = os.getenv("GOOGLE_API_KEY") or st.sidebar.text_input("Google API Key:", type="password")
-    if api_key_final: os.environ["GOOGLE_API_KEY"] = api_key_final
+
+elif provedor == "OpenAI (ChatGPT)":
+    mod = st.sidebar.selectbox("Modelo:", ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"])
+    modelo_selecionado = f"openai/{mod}"
+    api_key_final = os.getenv("OPENAI_API_KEY") or st.sidebar.text_input("OpenAI API Key:", type="password")
 
 elif provedor == "DeepSeek":
     mod = st.sidebar.selectbox("Modelo:", ["deepseek-chat", "deepseek-coder"])
     modelo_selecionado = f"deepseek/{mod}"
     api_key_final = os.getenv("DEEPSEEK_API_KEY") or st.sidebar.text_input("DeepSeek API Key:", type="password")
-    if api_key_final: os.environ["DEEPSEEK_API_KEY"] = api_key_final
 
 elif provedor == "Perplexity":
     mod = st.sidebar.selectbox("Modelo:", ["sonar-pro", "sonar", "sonar-reasoning"])
     modelo_selecionado = f"perplexity/{mod}"
     api_key_final = os.getenv("PERPLEXITY_API_KEY") or st.sidebar.text_input("Perplexity API Key:", type="password")
-    if api_key_final: os.environ["PERPLEXITY_API_KEY"] = api_key_final
-
-elif provedor == "ChatGPT":
-    mod = st.sidebar.selectbox("Modelo:", ["gpt-4o-mini", "gpt-4o"])
-    modelo_selecionado = f"openai/{mod}"
-    api_key_final = os.getenv("OPENAI_API_KEY") or st.sidebar.text_input("OpenAI API Key:", type="password")
-    if api_key_final: os.environ["OPENAI_API_KEY"] = api_key_final
 
 # --- CABEÇALHO E NOME ---
 st.title("👨‍🍳 ChefIA - Inteligência Gastronômica")
@@ -301,12 +324,12 @@ if not edited_df.empty:
         
         # ABA 1: Relatório
         with tab1:
-            st.info(f"Consultor ativo: **{provedor}**")
+            st.info(f"Modelo selecionado: **{modelo_selecionado}**")
             if st.button("💡 Gerar Relatório Automático"):
                 if not api_key_final:
-                    st.error("Configure a API Key.")
+                    st.error("⚠️ Configure a API Key na barra lateral para usar a IA.")
                 else:
-                    with st.spinner(f"Analisando seus dados..."):
+                    with st.spinner(f"Analisando seus dados com IA..."):
                         try:
                             # Pega extremos para análise
                             df_analise = pd.concat([
@@ -315,7 +338,7 @@ if not edited_df.empty:
                                 df_final.sort_values('lucratividade', ascending=True).head(5)
                             ]).drop_duplicates().to_csv(index=False, sep=';', decimal=',')
                             
-                            res = executar_agente_analise(df_analise, provedor, modelo_selecionado, api_key_final)
+                            res = executar_agente_analise(df_analise, modelo_selecionado, api_key_final)
                             st.markdown(limpar_texto_ia(res))
                         except Exception as e:
                             st.error(f"Erro na IA: {e}")
@@ -343,7 +366,7 @@ if not edited_df.empty:
                             try:
                                 # Passa os dados para o chat (ordenados por receita)
                                 df_contexto = df_final.sort_values(by='receita_total', ascending=False).head(60).to_csv(index=False, sep=';', decimal=',')
-                                resposta_raw = executar_chat(prompt, df_contexto, provedor, modelo_selecionado, api_key_final)
+                                resposta_raw = executar_chat(prompt, df_contexto, modelo_selecionado, api_key_final)
                                 resposta = limpar_texto_ia(resposta_raw)
                                 
                                 st.markdown(resposta)
