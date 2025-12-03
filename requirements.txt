@@ -3,7 +3,7 @@ pandas
 numpy
 plotly
 python-dotenv
-crewai
+crewai[google-genai]
 openai
 langchain-google-genai
 google-generativeai
