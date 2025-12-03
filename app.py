@@ -4,9 +4,13 @@ import plotly.express as px
 import os
 from dotenv import load_dotenv
 
-# --- IMPORTAÇÕES DE IA ---
-# Nota: CrewAI agora usa a classe LLM para gerenciar conexões via litellm
-from crewai import Agent, Task, Crew, Process, LLM
+# --- IMPORTAÇÃO DA LÓGICA DE IA (src/agentedeia.py) ---
+# Certifique-se de que o arquivo agentedeia.py esteja dentro da pasta 'src'
+try:
+    from src.agentedeia import executar_analise_menu, responder_chat_dados
+except ImportError:
+    st.error("Erro ao importar 'src.agentedeia'. Verifique se o arquivo existe e se a estrutura de pastas está correta.")
+    st.stop()
 
 # --- CONFIGURAÇÃO INICIAL ---
 load_dotenv()
@@ -23,90 +27,6 @@ def limpar_texto_ia(texto_obj):
     # Garante que o output seja string pura para evitar erros de renderização
     texto = str(texto_obj.raw) if hasattr(texto_obj, 'raw') else str(texto_obj)
     return texto.replace("$", "\\$")
-
-# --- FUNÇÕES DOS AGENTES ---
-def get_llm(modelo_string, api_key):
-    """
-    Instancia a LLM usando a classe nativa do CrewAI (via litellm).
-    O modelo_string deve vir no formato 'provider/model-name'.
-    """
-    return LLM(
-        model=modelo_string,
-        api_key=api_key,
-        temperature=0.4
-    )
-
-def executar_agente_analise(dados_csv, modelo_string, api_key):
-    llm = get_llm(modelo_string, api_key)
-
-    analista = Agent(
-        role="Analista de Menu",
-        goal="Identificar itens críticos e oportunidades de lucro.",
-        backstory="Especialista em Engenharia de Cardápio com foco em análise de dados.",
-        verbose=True,
-        llm=llm,
-        allow_delegation=False
-    )
-    
-    consultor = Agent(
-        role="Consultor Estratégico",
-        goal="Criar um plano de ação prático e resumido.",
-        backstory="Consultor experiente que dá dicas diretas e acionáveis para donos de restaurante.",
-        verbose=True,
-        llm=llm,
-        allow_delegation=False
-    )
-    
-    t1 = Task(
-        description=f"""
-        Analise os seguintes dados do menu (CSV):
-        {dados_csv}
-        
-        Sua missão:
-        1. Identifique o item classificado como 'Estrela' ou 'Oportunidade' mais promissor.
-        2. Identifique um item 'Crítico' ou 'Popular' que precisa de ajuste urgente.
-        """,
-        expected_output="Um resumo técnico curto identificando os itens.",
-        agent=analista
-    )
-    
-    t2 = Task(
-        description="Com base na análise técnica, escreva 3 recomendações práticas e curtas (máximo 1 frase cada). Use emojis.",
-        expected_output="Três tópicos com recomendações.",
-        agent=consultor,
-        context=[t1] # Passa o resultado da tarefa 1 para o consultor
-    )
-    
-    crew = Crew(agents=[analista, consultor], tasks=[t1, t2], process=Process.sequential)
-    return crew.kickoff()
-
-def executar_chat(pergunta, dados_csv, modelo_string, api_key):
-    llm = get_llm(modelo_string, api_key)
-    
-    analista_chat = Agent(
-        role="CFO Virtual de Restaurante",
-        goal="Responder perguntas sobre faturamento, margens e desempenho.",
-        backstory="Você tem acesso aos dados financeiros exatos do restaurante. Responda de forma direta, sem enrolação. Sempre que possível, cite números.",
-        verbose=True,
-        llm=llm,
-        allow_delegation=False
-    )
-    
-    task_chat = Task(
-        description=f"""
-        Pergunta do usuário: '{pergunta}'
-        
-        Dados do restaurante (Contexto):
-        {dados_csv}
-        
-        Responda à pergunta com base estritamente nos dados acima.
-        """,
-        expected_output="Resposta direta à pergunta do usuário.",
-        agent=analista_chat
-    )
-    
-    crew = Crew(agents=[analista_chat], tasks=[task_chat], process=Process.sequential)
-    return crew.kickoff()
 
 CORES_MATRIZ = {
     '⭐ Estrela': '#FFD700',
@@ -329,16 +249,19 @@ if not edited_df.empty:
                 if not api_key_final:
                     st.error("⚠️ Configure a API Key na barra lateral para usar a IA.")
                 else:
-                    with st.spinner(f"Analisando seus dados com IA..."):
+                    with st.spinner(f"Engenheiro de Menu e Consultor trabalhando..."):
                         try:
-                            # Pega extremos para análise
+                            # Pega extremos para análise (foca no que importa para economizar tokens)
                             df_analise = pd.concat([
                                 df_final.sort_values('lucratividade', ascending=False).head(10),
                                 df_final.sort_values('popularidade', ascending=False).head(10),
                                 df_final.sort_values('lucratividade', ascending=True).head(5)
-                            ]).drop_duplicates().to_csv(index=False, sep=';', decimal=',')
+                            ]).drop_duplicates()
                             
-                            res = executar_agente_analise(df_analise, modelo_selecionado, api_key_final)
+                            # CHAMADA DA NOVA FUNÇÃO DO ARQUIVO EXTERNO
+                            # Note a ordem dos argumentos definida em agentedeia.py: (dados, api_key, modelo)
+                            res = executar_analise_menu(df_analise, api_key_final, modelo_selecionado)
+                            
                             st.markdown(limpar_texto_ia(res))
                         except Exception as e:
                             st.error(f"Erro na IA: {e}")
@@ -364,9 +287,13 @@ if not edited_df.empty:
                     with st.chat_message("assistant", avatar="👨‍🍳"):
                         with st.spinner("Calculando..."):
                             try:
-                                # Passa os dados para o chat (ordenados por receita)
-                                df_contexto = df_final.sort_values(by='receita_total', ascending=False).head(60).to_csv(index=False, sep=';', decimal=',')
-                                resposta_raw = executar_chat(prompt, df_contexto, modelo_selecionado, api_key_final)
+                                # Passa os dados para o chat
+                                df_contexto = df_final.sort_values(by='receita_total', ascending=False).head(60)
+                                
+                                # CHAMADA DA NOVA FUNÇÃO DO ARQUIVO EXTERNO
+                                # Note a ordem dos argumentos: (pergunta, dados, api_key, modelo)
+                                resposta_raw = responder_chat_dados(prompt, df_contexto, api_key_final, modelo_selecionado)
+                                
                                 resposta = limpar_texto_ia(resposta_raw)
                                 
                                 st.markdown(resposta)

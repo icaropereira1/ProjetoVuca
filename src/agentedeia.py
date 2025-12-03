@@ -54,7 +54,7 @@ def executar_analise_menu(df_dados, api_key, modelo_nome):
            - Eles NÃO PODEM ter margem baixa. Se um prato feito é 'Popular' mas tem lucro baixo, isso é uma emergência (Ficha técnica errada ou preço defasado).
            - Identifique 'Oportunidades' (Quebra-cabeça): Pratos de alto lucro que precisam de destaque (foto, descrição).
 
-        Saída esperada: Uma análise técnica que cita NOMES dos produtos e compara seus custos vs preços.
+        Saída esperada: Uma análise técnica EM PORTUGUES que cita NOMES dos produtos e compara seus custos vs preços.
         """,
         expected_output="Relatório técnico detalhando anomalias de precificação e classificação dos itens.",
         agent=analista
@@ -72,6 +72,7 @@ def executar_analise_menu(df_dados, api_key, modelo_nome):
            - Para PRODUÇÃO Crítica: Revise a ficha técnica ou remova do cardápio.
            - Para OPORTUNIDADES: Sugira "Sugestão do Chef" ou posts no Instagram.
         3. **Tom de Voz:** Informal, direto e motivador. Use emojis.
+        4. **Responda em portugues**
         
         Formatação Obrigatória:
         - Use Markdown (negrito, listas).
